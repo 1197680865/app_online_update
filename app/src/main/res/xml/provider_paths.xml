@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--外部存储 用content://包名.fileprovider/external_files/maas/apk名称.apk  代替实际sdcard/maas/apk名称.apk-->
+    <external-path name="external_files" path="maas/"/>
+    <files-path  name="files_root" path="apks/" />
+    <!--内部存储临时存储
+    uri地址: content://包名.fileprovider/cache_root/apk名称.apk
+    实际地址 ：/data/user/0/包名/cache/apks/apk名称.apk
+    -->
+    <cache-path name="cache_root" path="apks/"/>
+</paths>
