@@ -100,11 +100,18 @@ public class DownloadUtil {
             os = new BufferedOutputStream(new FileOutputStream(file));
             byte data[] = new byte[sBufferSize];
             int len;
+            int lastProgress = 0;
             while ((len = is.read(data, 0, sBufferSize)) != -1) {
                 os.write(data, 0, len);
                 currentLength += len;
                 //计算当前下载进度
-                downloadListener.onProgress((int) (100 * currentLength / totalLength));
+                int progress =(int) (100 * currentLength / totalLength);
+                if (progress -lastProgress>=1)
+                {
+                    downloadListener.onProgress(progress);
+                    lastProgress =progress;
+                }
+
             }
             //下载完成，重命名为实际文件名称
             boolean b = FileUtils.renameFile(file.getAbsolutePath(), realPath);
