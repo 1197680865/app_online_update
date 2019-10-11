@@ -4,15 +4,13 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
-import android.os.Environment;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.support.v4.content.FileProvider;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.util.Log;
-
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -31,9 +29,10 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
     protected ApiService apiService = null;
     public static final String SERVER_URL = "http://111.198.24.33:6119/";//53服务器
-    private TextView tvVersion;
+    private TextView tvVersion,tvProgress;
     private boolean firstOpen = true;
     private AppVersionBean appVersion = null;
+    private boolean appDownloadCompelte = false;
     private Handler handler = new Handler(new Handler.Callback() {
         @Override
         public boolean handleMessage(Message message) {
@@ -42,11 +41,13 @@ public class MainActivity extends AppCompatActivity {
                     Toast.makeText(getApplicationContext(), "开始下载", Toast.LENGTH_SHORT).show();
                     break;
                 case 1002:
-//                    int progress = message.getData().getInt("progress");
-//                    Toast.makeText(getApplicationContext(), "下载进度:" + progress, Toast.LENGTH_SHORT).show();
+                    int progress = message.getData().getInt("progress");
+                    tvProgress.setText(String.format("下载进度：%d",progress));
+                    Toast.makeText(getApplicationContext(), "下载进度:" + progress, Toast.LENGTH_SHORT).show();
                     break;
                 case 1003:
                     Toast.makeText(getApplicationContext(), "下载完成", Toast.LENGTH_SHORT).show();
+                    appDownloadCompelte = true;
                     String path = message.getData().getString("path");
                     if (path != null) {
                         File tempFile = new File(path);
@@ -68,6 +69,7 @@ public class MainActivity extends AppCompatActivity {
                     break;
                 case 1004:
                     Toast.makeText(getApplicationContext(), "下载失败", Toast.LENGTH_SHORT).show();
+                    appDownloadCompelte = true;
                     break;
             }
             return true;
@@ -79,6 +81,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         tvVersion = findViewById(R.id.tv1);
+        tvProgress = findViewById(R.id.tv2);
         String localVersionName = AppVersionUtils.getLocalVersionName(this);
         tvVersion.setText(localVersionName);
         Retrofit retrofit =
@@ -168,54 +171,61 @@ public class MainActivity extends AppCompatActivity {
                 .progress(false, 100, false)
                 .cancelListener(dialog -> {
                     //取消
-                }).showListener(dialogInterface -> {
-            final MaterialDialog dialog = (MaterialDialog) dialogInterface;
-            DownloadUtil.download(url, getCacheDir().getAbsolutePath() + "/apks/maas-app-" + versionName + ".apk", new DownloadListener() {
-                @Override
-                public void onStart() {
+                    if (!appDownloadCompelte) {
+                        Toast.makeText(getApplicationContext(), "安装包后台下载中...", Toast.LENGTH_LONG).show();
+                    }
+                }).showListener(new DialogInterface.OnShowListener() {
+            @Override
+            public void onShow(DialogInterface dialogInterface) {
+                final MaterialDialog dialog = (MaterialDialog) dialogInterface;
+                DownloadUtil.myCacheDirPath = MainActivity.this.getCacheDir().getAbsolutePath() + "/apks/";
+                DownloadUtil.download(url, MainActivity.this.getCacheDir().getAbsolutePath() + "/apks/maas-app-" + versionName + ".apk", new DownloadListener() {
+                    @Override
+                    public void onStart() {
 
+                        Message message = new Message();
+                        message.what = 1001;
+                        handler.sendMessage(message);
+                    }
+
+                    @Override
+                    public void onProgress(int progress) {
                     Message message = new Message();
-                    message.what = 1001;
-                    handler.sendMessage(message);
-                }
-
-                @Override
-                public void onProgress(int progress) {
-//                    Message message = new Message();
-//                    message.what = 1002;
-//                    Bundle bundle = new Bundle();
-//                    bundle.putInt("progress", progress);
-//                    message.setData(bundle);
-//                    handler.sendMessage(message);
-                    dialog.setProgress(progress);
-
-                }
-
-                @Override
-                public void onFinish(String path) {
-
-                    Message message = new Message();
-                    message.what = 1003;
+                    message.what = 1002;
                     Bundle bundle = new Bundle();
-                    bundle.putString("path", path);
+                    bundle.putInt("progress", progress);
                     message.setData(bundle);
                     handler.sendMessage(message);
-                    runOnUiThread(() -> {
-                        dialog.setContent("下载完成");
-                    });
-                }
+                        dialog.setProgress(progress);
 
-                @Override
-                public void onFail(String errorInfo) {
+                    }
 
-                    Message message = new Message();
-                    message.what = 1004;
-                    handler.sendMessage(message);
-                    runOnUiThread(() -> {
-                        dialog.setContent("下载失败，请重试");
-                    });
-                }
-            });
+                    @Override
+                    public void onFinish(String path) {
+
+                        Message message = new Message();
+                        message.what = 1003;
+                        Bundle bundle = new Bundle();
+                        bundle.putString("path", path);
+                        message.setData(bundle);
+                        handler.sendMessage(message);
+                        runOnUiThread(() -> {
+                            dialog.setContent("下载完成");
+                        });
+                    }
+
+                    @Override
+                    public void onFail(String errorInfo) {
+
+                        Message message = new Message();
+                        message.what = 1004;
+                        handler.sendMessage(message);
+                        runOnUiThread(() -> {
+                            dialog.setContent("下载失败，请重试");
+                        });
+                    }
+                });
+            }
         }).show();
 
 

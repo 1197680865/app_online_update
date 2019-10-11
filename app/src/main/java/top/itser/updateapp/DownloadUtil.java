@@ -9,6 +9,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.UUID;
 import java.util.concurrent.Executors;
 
 import okhttp3.ResponseBody;
@@ -18,7 +19,11 @@ import retrofit2.Response;
 import retrofit2.Retrofit;
 
 public class DownloadUtil {
+    private static final String TAG = "DownloadUtil";
     public static final String SERVER_URL = "http://111.198.24.33:6119/";//53服务器
+    private static String realPath;
+    private static String tempPath;
+    public static String myCacheDirPath; //存放安装包的缓存路径，getCacheDir().getAbsolutePath() + "/apks"
 
     public static void download(String url, final String path, final DownloadListener downloadListener) {
 
@@ -48,6 +53,8 @@ public class DownloadUtil {
 
     private static void writeResponseToDisk(String path, Response<ResponseBody> response, DownloadListener downloadListener) {
         //从response获取输入流以及总大小
+        realPath =path;
+        tempPath =path;
         writeFileFromIS(new File(path), response.body().byteStream(), response.body().contentLength(), downloadListener);
     }
 
@@ -60,9 +67,21 @@ public class DownloadUtil {
 
         //创建文件
         if (!file.exists()) {
+            //需要下载安装包
+            //清楚缓存
+            boolean delFlag = FileUtils.deleteFiles(myCacheDirPath);
+            if (delFlag==false)
+            {
+                Log.e(TAG, "writeFileFromIS: 清除缓存失败" );
+            }
+
             if (!file.getParentFile().exists())
                 file.getParentFile().mkdir();
             try {
+                //如果没有已下载好的安装包，则需要临时下载，临时的包名加入后缀suffix，下载完成后重命名为真实名称
+                String suffix ="_"+UUID.randomUUID().toString().substring(0,4);
+                tempPath = tempPath +suffix;
+                file = new File(tempPath);
                 file.createNewFile();
             } catch (IOException e) {
                 e.printStackTrace();
@@ -87,8 +106,16 @@ public class DownloadUtil {
                 //计算当前下载进度
                 downloadListener.onProgress((int) (100 * currentLength / totalLength));
             }
-            //下载完成，并返回保存的文件路径
-            downloadListener.onFinish(file.getAbsolutePath());
+            //下载完成，重命名为实际文件名称
+            boolean b = FileUtils.renameFile(file.getAbsolutePath(), realPath);
+            if (b){
+                // 并返回保存的文件路径
+                downloadListener.onFinish(realPath);
+            }else {
+                Log.e(TAG, "writeFileFromIS: 文件重命名失败" );
+                downloadListener.onFail("文件重命名失败");
+            }
+
         } catch (IOException e) {
             e.printStackTrace();
             downloadListener.onFail("IOException");
@@ -107,6 +134,8 @@ public class DownloadUtil {
             }
         }
     }
+
+
 
 
 }
